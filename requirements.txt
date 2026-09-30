@@ -1,0 +1,13 @@
+langchain==0.3.27
+langchain-community==0.3.29
+langchain-core==0.3.75
+langchain-text-splitters==0.3.9
+langchain-chroma==0.2.5
+langchain-google-genai==2.1.8
+langchain-groq==0.2.3
+chromadb==1.0.20
+rank-bm25==0.2.2
+pypdf==6.0.0
+python-dotenv==1.1.1
+streamlit==1.49.1
+unstructured[pdf]==0.18.14
