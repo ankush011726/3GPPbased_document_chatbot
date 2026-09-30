@@ -1,5 +1,5 @@
 """
-Answer generation with Groq, plus query rewriting for multi-turn chat.
+Answer generation with Gemini, plus query rewriting for multi-turn chat.
 """
 
 from langchain_google_genai import ChatGoogleGenerativeAI
@@ -12,10 +12,6 @@ def get_llm() -> ChatGoogleGenerativeAI:
 
 
 def rewrite_query(query: str, history: list[dict], llm: ChatGoogleGenerativeAI) -> str:
-    """Make a follow-up question standalone so it can be searched on its own.
-
-    Example: "What about him?" -> "What is the CEO's name?" (using history)
-    """
     if not history:
         return query
 
@@ -31,7 +27,6 @@ def rewrite_query(query: str, history: list[dict], llm: ChatGoogleGenerativeAI) 
 
 
 def answer_question(query: str, chunks: list, llm: ChatGoogleGenerativeAI, history: list[dict] | None = None) -> str:
-    """Answer using only the retrieved chunks. Refuse if the answer isn't there."""
     context = "\n\n".join(c.page_content for c in chunks) if chunks else "(no documents found)"
 
     history_text = ""

@@ -1,12 +1,8 @@
 """
-Ingestion pipeline: docs/ -> chunks -> Gemini embeddings -> Chroma.
+Ingestion pipeline: docs/ -> chunks -> Hugging Face embeddings -> Chroma.
 
 Run this whenever you add or change documents:
     python ingest.py
-
-PDFs are parsed with unstructured (images + tables) when it is installed,
-otherwise it falls back to pypdf (text-only PDFs).
-DOCX files are parsed with unstructured when available, otherwise docx2txt.
 """
 
 import os
@@ -33,21 +29,18 @@ except ImportError:
 
 
 def load_pdf(path: str, filename: str) -> list[Document]:
-    """Load one PDF. Uses unstructured when available, else pypdf."""
     if HAS_UNSTRUCTURED:
         return _load_with_unstructured(path, filename)
     return _load_with_pypdf(path, filename)
 
 
 def load_docx(path: str, filename: str) -> list[Document]:
-    """Load one DOCX. Uses unstructured when available, else docx2txt."""
     if HAS_UNSTRUCTURED:
         return _load_docx_with_unstructured(path, filename)
     return _load_docx_with_docx2txt(path, filename)
 
 
 def _load_with_unstructured(path: str, filename: str) -> list[Document]:
-    """hi_res strategy keeps tables as structured text and pulls out images."""
     print(f"  Parsing {filename} with unstructured (hi_res)...")
     elements = partition_pdf(
         filename=path,
@@ -67,7 +60,6 @@ def _load_with_unstructured(path: str, filename: str) -> list[Document]:
 
 
 def _load_docx_with_unstructured(path: str, filename: str) -> list[Document]:
-    """Parse docx with unstructured, chunk by title."""
     print(f"  Parsing {filename} with unstructured (docx)...")
     elements = partition_docx(filename=path)
     chunks = chunk_by_title(
@@ -83,7 +75,6 @@ def _load_docx_with_unstructured(path: str, filename: str) -> list[Document]:
 
 
 def _load_with_pypdf(path: str, filename: str) -> list[Document]:
-    """Plain text extraction, one Document per page."""
     print(f"  Loading {filename} with pypdf...")
     loader = PyPDFLoader(path)
     documents = []
@@ -95,7 +86,6 @@ def _load_with_pypdf(path: str, filename: str) -> list[Document]:
 
 
 def _load_docx_with_docx2txt(path: str, filename: str) -> list[Document]:
-    """Plain text extraction with docx2txt, one Document per file."""
     print(f"  Loading {filename} with docx2txt...")
     loader = Docx2txtLoader(path)
     documents = loader.load()
@@ -105,7 +95,6 @@ def _load_docx_with_docx2txt(path: str, filename: str) -> list[Document]:
 
 
 def load_documents(docs_dir: str) -> list[Document]:
-    """Load every PDF and DOCX in the docs folder."""
     if not os.path.exists(docs_dir):
         raise FileNotFoundError(f"The folder '{docs_dir}' does not exist.")
 
@@ -132,7 +121,6 @@ def load_documents(docs_dir: str) -> list[Document]:
 
 
 def split_documents(documents: list[Document]) -> list[Document]:
-    """Split into overlapping chunks (only needed for pypdf pages)."""
     splitter = RecursiveCharacterTextSplitter(
         chunk_size=config.CHUNK_SIZE,
         chunk_overlap=config.CHUNK_OVERLAP,
@@ -145,7 +133,6 @@ def split_documents(documents: list[Document]) -> list[Document]:
 
 
 def create_vector_store(chunks: list[Document]) -> Chroma:
-    """Embed chunks and save them to disk."""
     embeddings = HuggingFaceEmbeddings(model_name=config.EMBEDDING_MODEL)
     vectorstore = Chroma.from_documents(
         documents=chunks,
@@ -158,7 +145,6 @@ def create_vector_store(chunks: list[Document]) -> Chroma:
 
 
 def load_vector_store() -> Chroma:
-    """Load the existing vector store without re-embedding anything."""
     embeddings = HuggingFaceEmbeddings(model_name=config.EMBEDDING_MODEL)
     return Chroma(
         persist_directory=config.CHROMA_DIR,
@@ -178,7 +164,6 @@ def main():
 
     documents = load_documents(config.DOCS_DIR)
 
-    # unstructured already chunks by title; pypdf pages need splitting
     if HAS_UNSTRUCTURED:
         chunks = documents
     else:

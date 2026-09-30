@@ -14,7 +14,6 @@ import config
 
 
 def reciprocal_rank_fusion(result_lists, k=60):
-    """Fuse several ranked lists into one. A chunk ranked high in many lists wins."""
     scores = defaultdict(float)
     docs = {}
     for results in result_lists:
@@ -30,7 +29,6 @@ class Retriever:
         self.db = db
         self.llm = ChatGoogleGenerativeAI(model=config.CHAT_MODEL, temperature=0)
 
-        # BM25 works on raw text, so pull the chunks back out of Chroma
         raw = db.get()
         chunks = [
             Document(page_content=text, metadata=meta or {})
@@ -40,26 +38,21 @@ class Retriever:
         self.bm25.k = 15
 
     def retrieve(self, query: str) -> list[Document]:
-        """Full pipeline for one question. Returns the best chunks."""
         queries = self._expand_query(query)
 
-        # Hybrid search: vector (semantic) + BM25 (exact keywords), weighted
         vector_retriever = self.db.as_retriever(search_kwargs={"k": 15})
         hybrid = EnsembleRetriever(
             retrievers=[vector_retriever, self.bm25],
             weights=[config.HYBRID_VECTOR_WEIGHT, config.HYBRID_BM25_WEIGHT],
         )
 
-        # Search with every query variation, then fuse the rankings
         all_results = [hybrid.invoke(q) for q in queries]
         fused = reciprocal_rank_fusion(all_results)
 
-        # LLM reranker picks the most relevant ones
         top = fused[: config.RERANK_TOP_N]
         return self._rerank(query, top)[: config.RETRIEVAL_K]
 
     def _expand_query(self, query: str) -> list[str]:
-        """Ask the LLM for alternative phrasings of the question."""
         prompt = (
             f"Rewrite the following question in {config.MULTI_QUERY_COUNT} different ways "
             "that would help find the same information in documents. "
@@ -71,7 +64,6 @@ class Retriever:
         return [query] + variations[: config.MULTI_QUERY_COUNT]
 
     def _rerank(self, query: str, chunks: list[Document]) -> list[Document]:
-        """Ask the LLM to keep only relevant chunks, most relevant first."""
         if not chunks:
             return chunks
 
